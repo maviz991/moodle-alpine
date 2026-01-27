@@ -1,0 +1,38 @@
+# ==============================================================================
+# Moodle Docker - .gitignore
+# ==============================================================================
+
+# Variáveis de ambiente (contém senhas!)
+.env
+
+# Certificados SSL
+certs/
+*.pem
+*.key
+*.crt
+
+# Logs
+logs/
+*.log
+
+# Dados do Moodle
+moodledata/
+
+# Backups
+backups/
+*.sql
+*.tar.gz
+
+# Docker volumes locais
+data/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,97 @@
+# ==============================================================================
+# Docker Compose - Desenvolvimento com Plugins em Volume
+# ==============================================================================
+#
+# USE APENAS PARA DESENVOLVIMENTO!
+# 
+# Este compose monta plugins como volumes, permitindo edição em tempo real.
+# Para produção, use a imagem com plugins built-in (Dockerfile.plugins)
+#
+# Uso:
+#   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# ==============================================================================
+
+services:
+  moodle:
+    # Usa imagem básica (sem plugins built-in)
+    build:
+      context: .
+      dockerfile: Dockerfile
+    
+    environment:
+      MOODLE_DEBUG: "true"
+      MOODLE_SSL_PROXY: "false"
+    
+    volumes:
+      # Monta código fonte do Moodle para edição (APENAS DEV!)
+      # - ./moodle-src:/var/www/html
+      
+      # ==================================================================
+      # PLUGINS EM DESENVOLVIMENTO
+      # Monta cada plugin individualmente para edição em tempo real
+      # ==================================================================
+      
+      # Módulos (mod)
+      # - ./plugins/dev/mod_myplugin:/var/www/html/mod/myplugin
+      
+      # Blocos
+      # - ./plugins/dev/block_myblock:/var/www/html/blocks/myblock
+      
+      # Local
+      # - ./plugins/dev/local_myplugin:/var/www/html/local/myplugin
+      
+      # Temas
+      # - ./plugins/dev/theme_mytheme:/var/www/html/theme/mytheme
+      
+      # Auth
+      # - ./plugins/dev/auth_myplugin:/var/www/html/auth/myplugin
+      
+      # ==================================================================
+      # CONFIGURAÇÕES DE DESENVOLVIMENTO
+      # ==================================================================
+      
+      # PHP config para dev (mais verbose)
+      - ./config/php-dev.ini:/usr/local/etc/php/conf.d/99-dev.ini:ro
+      
+      # Logs em tempo real
+      - ./logs/php:/var/log/php
+    
+    ports:
+      # Expõe PHP-FPM diretamente para debug
+      - "9000:9000"
+
+  # PHPMyAdmin para debug do banco
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: moodle-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 128M
+    ports:
+      - "8081:80"
+    networks:
+      - moodle-network
+    depends_on:
+      - mysql
+
+  # Mailhog para capturar emails de teste
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: moodle-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      - moodle-network
+
+  # Nginx com config simplificada para dev
+  nginx:
+    volumes:
+      - ./nginx/moodle-dev.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+      # Remove HTTPS em dev

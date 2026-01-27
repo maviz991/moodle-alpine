@@ -17,7 +17,7 @@ services:
   moodle:
     build:
       context: .
-      dockerfile: Dockerfile.plugins
+      dockerfile: Dockerfile
       args:
         MOODLE_VERSION: "405"
         PHP_VERSION: "8.2"
@@ -29,8 +29,8 @@ services:
     environment:
       # Banco de Dados (OBRIGATÓRIOS)
       MOODLE_DB_TYPE: "mysqli"
-      MOODLE_DB_HOST: "${MOODLE_DB_HOST:-mysql}"
-      MOODLE_DB_PORT: "${MOODLE_DB_PORT:-3306}"
+      MOODLE_DB_HOST: "mysql"           # Altere para seu servidor MySQL externo
+      MOODLE_DB_PORT: "3306"
       MOODLE_DB_NAME: "${MOODLE_DB_NAME:-moodle}"
       MOODLE_DB_USER: "${MOODLE_DB_USER:-moodle}"
       MOODLE_DB_PASSWORD: "${MOODLE_DB_PASSWORD}"
@@ -67,10 +67,10 @@ services:
     networks:
       - moodle-network
     
-    # Dependências (descomente se usar MySQL local)
-    # depends_on:
-    #   mysql:
-    #     condition: service_healthy
+    # Dependências
+    depends_on:
+      mysql:
+        condition: service_healthy
     
     # Recursos (ajuste conforme necessidade)
     deploy:
@@ -109,8 +109,8 @@ services:
       # Arquivos estáticos do Moodle (somente leitura)
       - moodle-www:/var/www/html:ro
       
-      # Certificados SSL
-      - ./certs:/etc/nginx/certs:ro
+      # Certificados SSL (gere com Let's Encrypt ou use seus próprios)
+      # - ./certs:/etc/nginx/certs:ro
       
       # Logs
       - ./logs/nginx:/var/log/nginx

@@ -1,0 +1,20 @@
+Plugin	Version	URL
+mod_coursecertificate	4.5.7	https://moodle.org/plugins/mod_coursecertificate/
+mod_hvp	1.27.2	https://moodle.org/plugins/mod_hvp
+block_listacursos	1.1	
+block_xp	18.3	https://moodle.org/plugins/block_xp
+tool_certificate	4.5.5	https://moodle.org/plugins/tool_certificate
+tool_dynamic_cohorts	2025051200	https://moodle.org/plugins/tool_dynamic_cohorts
+tool_health	1.1.2	https://moodle.org/plugins/tool_health
+format_designer	Version 1.6	https://moodle.org/plugins/format_designer
+format_flexsections	4.1.4	https://moodle.org/plugins/format_flexsections
+format_kickstart	Version 1.5	https://moodle.org/plugins/format_kickstart
+format_onetopic	4.4.06(LasAcacias)	https://moodle.org/plugins/format_onetopic
+format_popups	1.0.22	https://moodle.org/plugins/format_popups
+format_remuiformat	4.1.18	https://moodle.org/plugins/format_remuiformat
+format_tiles	4.5.0.21	https://moodle.org/plugins/format_tiles
+theme_boost_union	v4.5-r29	https://moodle.org/plugins/theme_boost_union
+local_copy	1.1.10	https://moodle.org/plugins/local_copy
+local_ldap	v4.4.0	https://moodle.org/plugins/local_ldap
+local_learningtools	v1.3	https://moodle.org/plugins/local_learningtools
+local_recompletion	2025041400	https://moodle.org/plugins/local_recompletion

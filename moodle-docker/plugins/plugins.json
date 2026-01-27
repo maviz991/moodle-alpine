@@ -1,0 +1,89 @@
+{
+    "$schema": "./plugins-schema.json",
+    "_comment": "Manifesto de plugins do Moodle - CDHU",
+    "_updated": "2025-01-26",
+    
+    "plugins": [
+        {
+            "name": "mod_hvp",
+            "description": "H5P Interactive Content",
+            "type": "mod",
+            "source": "github",
+            "repo": "h5p/moodle-mod_hvp",
+            "version": "v1.22.4",
+            "enabled": true
+        },
+        {
+            "name": "mod_attendance",
+            "description": "Attendance Module",
+            "type": "mod",
+            "source": "github",
+            "repo": "danmarsden/moodle-mod_attendance",
+            "version": "v4.2.0",
+            "enabled": true
+        },
+        {
+            "name": "mod_questionnaire",
+            "description": "Questionnaire Module",
+            "type": "mod",
+            "source": "github",
+            "repo": "PoetOS/moodle-mod_questionnaire",
+            "version": "v4.1.2",
+            "enabled": true
+        },
+        {
+            "name": "block_completion_progress",
+            "description": "Completion Progress Block",
+            "type": "block",
+            "source": "github",
+            "repo": "deraadt/moodle-block_completion_progress",
+            "version": "v4.0.0",
+            "enabled": true
+        },
+        {
+            "name": "theme_boost_union",
+            "description": "Boost Union Theme",
+            "type": "theme",
+            "source": "github",
+            "repo": "moodle-an-hochschulen/moodle-theme_boost_union",
+            "version": "v4.5-r1",
+            "enabled": false,
+            "_comment": "Exemplo desabilitado"
+        },
+        {
+            "name": "local_adminer",
+            "description": "Adminer Database Manager",
+            "type": "local",
+            "source": "url",
+            "url": "https://moodle.org/plugins/download.php/12345/local_adminer_moodle42.zip",
+            "version": "1.0.0",
+            "enabled": false,
+            "_comment": "APENAS para desenvolvimento - NUNCA em produção!"
+        },
+        {
+            "name": "auth_saml2",
+            "description": "SAML2 Authentication",
+            "type": "auth",
+            "source": "github",
+            "repo": "catalyst/moodle-auth_saml2",
+            "version": "v4.5.0",
+            "enabled": true,
+            "_comment": "Para integração com Keycloak/LDAP"
+        },
+        {
+            "name": "report_customsql",
+            "description": "Ad-hoc Database Queries",
+            "type": "report",
+            "source": "github",
+            "repo": "moodleou/moodle-report_customsql",
+            "version": "v4.5.0",
+            "enabled": true
+        }
+    ],
+    
+    "settings": {
+        "fail_on_error": true,
+        "verify_checksums": true,
+        "cleanup_after_install": true
+    }
+}

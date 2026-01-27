@@ -1,0 +1,187 @@
+{
+    "$schema": "./plugins-schema.json",
+    "_comment": "Manifesto de plugins do Moodle - CDHU",
+    "_updated": "2026-01-26",
+
+    "plugins": [
+        {
+            "name": "mod_coursecertificate",
+            "description": "Course Certificate - Issue certificates to students",
+            "type": "mod",
+            "source": "github",
+            "repo": "moodleworkplace/moodle-mod_coursecertificate",
+            "version": "v4.5.7",
+            "enabled": true
+        },
+        {
+            "name": "mod_hvp",
+            "description": "H5P Interactive Content",
+            "type": "mod",
+            "source": "github",
+            "repo": "h5p/moodle-mod_hvp",
+            "version": "1.27.2",
+            "enabled": true
+        },
+        {
+            "name": "block_listacursos",
+            "description": "Lista de Cursos Block",
+            "type": "block",
+            "source": "url",
+            "url": "",
+            "version": "1.1",
+            "enabled": false,
+            "_comment": "Plugin local/privado - URL de download necessaria"
+        },
+        {
+            "name": "block_xp",
+            "description": "Level Up XP - Gamification",
+            "type": "block",
+            "source": "github",
+            "repo": "FMCorz/moodle-block_xp",
+            "version": "v18.3",
+            "enabled": true
+        },
+        {
+            "name": "tool_certificate",
+            "description": "Certificate Tool - Create certificate templates",
+            "type": "tool",
+            "source": "github",
+            "repo": "moodleworkplace/moodle-tool_certificate",
+            "version": "v4.5.5",
+            "enabled": true
+        },
+        {
+            "name": "tool_dynamic_cohorts",
+            "description": "Dynamic Cohorts - Auto-populate cohorts based on rules",
+            "type": "tool",
+            "source": "github",
+            "repo": "catalyst/moodle-tool_dynamic_cohorts",
+            "version": "MOODLE_404_STABLE",
+            "enabled": true
+        },
+        {
+            "name": "tool_health",
+            "description": "Health Check - System diagnostics",
+            "type": "tool",
+            "source": "github",
+            "repo": "moodlehq/moodle-tool_health",
+            "version": "v1.1.2",
+            "enabled": true
+        },
+        {
+            "name": "format_designer",
+            "description": "Designer Course Format",
+            "type": "format",
+            "source": "github",
+            "repo": "bdecentgmbh/moodle-format_designer",
+            "version": "v1.6-r4",
+            "enabled": true
+        },
+        {
+            "name": "format_flexsections",
+            "description": "Flexible Sections Course Format",
+            "type": "format",
+            "source": "github",
+            "repo": "marinaglancy/moodle-format_flexsections",
+            "version": "v4.1.4",
+            "enabled": true
+        },
+        {
+            "name": "format_kickstart",
+            "description": "Kickstart Course Format",
+            "type": "format",
+            "source": "github",
+            "repo": "bdecentgmbh/moodle-format_kickstart",
+            "version": "v1.5-r4",
+            "enabled": true
+        },
+        {
+            "name": "format_onetopic",
+            "description": "Onetopic Course Format - Tabbed sections",
+            "type": "format",
+            "source": "github",
+            "repo": "davidherney/moodle-format_onetopic",
+            "version": "v4.1.10",
+            "enabled": true
+        },
+        {
+            "name": "format_popups",
+            "description": "Popups Course Format",
+            "type": "format",
+            "source": "github",
+            "repo": "dthies/moodle-format_popups",
+            "version": "v1.0.22",
+            "enabled": true
+        },
+        {
+            "name": "format_remuiformat",
+            "description": "RemUI Course Format - Cards/List view",
+            "type": "format",
+            "source": "url",
+            "url": "",
+            "version": "4.1.18",
+            "enabled": false,
+            "_comment": "Edwiser proprietary - requires license from moodle.org"
+        },
+        {
+            "name": "format_tiles",
+            "description": "Tiles Course Format - Visual tiles layout",
+            "type": "format",
+            "source": "github",
+            "repo": "devlionco/moodle-format_tiles",
+            "version": "master",
+            "enabled": true
+        },
+        {
+            "name": "theme_boost_union",
+            "description": "Boost Union Theme - Extended Boost theme",
+            "type": "theme",
+            "source": "github",
+            "repo": "moodle-an-hochschulen/moodle-theme_boost_union",
+            "version": "v4.5-r29",
+            "enabled": true
+        },
+        {
+            "name": "local_copy",
+            "description": "Copy Course Content - Duplicate activities",
+            "type": "local",
+            "source": "github",
+            "repo": "EduardoKrausME/moodle-local_copy",
+            "version": "1.1.12",
+            "enabled": true
+        },
+        {
+            "name": "local_ldap",
+            "description": "LDAP Sync - Extended LDAP functionality",
+            "type": "local",
+            "source": "github",
+            "repo": "LafColITS/moodle-local_ldap",
+            "version": "v4.4.0",
+            "enabled": true
+        },
+        {
+            "name": "local_learningtools",
+            "description": "Learning Tools - Student productivity tools",
+            "type": "local",
+            "source": "github",
+            "repo": "bdecentgmbh/moodle-local_learningtools",
+            "version": "v1.3-r3",
+            "enabled": true
+        },
+        {
+            "name": "local_recompletion",
+            "description": "Recompletion - Reset course completion for re-enrollment",
+            "type": "local",
+            "source": "github",
+            "repo": "danmarsden/moodle-local_recompletion",
+            "version": "MOODLE_405_STABLE",
+            "enabled": true
+        }
+    ],
+
+    "settings": {
+        "fail_on_error": false,
+        "verify_checksums": false,
+        "cleanup_after_install": true
+    }
+}

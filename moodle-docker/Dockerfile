@@ -9,9 +9,6 @@ ARG PHP_VERSION=8.2
 
 FROM php:${PHP_VERSION}-fpm-alpine AS base
 
-# Re-declare ARGs after FROM (they don't persist across FROM)
-ARG MOODLE_VERSION=405
-
 LABEL maintainer="CDHU Infrastructure Team"
 LABEL description="Moodle LMS - Instalação Segura"
 LABEL moodle.version="${MOODLE_VERSION}"
@@ -28,22 +25,6 @@ ENV PHP_EXPOSE_PHP=Off
 
 # Timezone
 ENV TZ=America/Sao_Paulo
-
-# ==============================================================================
-# PROXY CONFIGURATION (FortiGate SSL inspection)
-# ==============================================================================
-ARG HTTP_PROXY=http://10.71.48.17:8080
-ARG HTTPS_PROXY=http://10.71.48.17:8080
-ENV http_proxy=${HTTP_PROXY}
-ENV https_proxy=${HTTPS_PROXY}
-ENV HTTP_PROXY=${HTTP_PROXY}
-ENV HTTPS_PROXY=${HTTPS_PROXY}
-
-# ==============================================================================
-# CERTIFICADO CA DO FORTIGATE (SSL inspection proxy)
-# ==============================================================================
-COPY config/fortigate_proxy.crt /usr/local/share/ca-certificates/
-RUN cat /usr/local/share/ca-certificates/fortigate_proxy.crt >> /etc/ssl/certs/ca-certificates.crt
 
 # ==============================================================================
 # INSTALAÇÃO DE DEPENDÊNCIAS DO SISTEMA
@@ -103,6 +84,7 @@ RUN docker-php-ext-configure gd \
         gd \
         intl \
         soap \
+        xmlrpc \
         zip \
         opcache \
         exif \
@@ -147,7 +129,7 @@ COPY config/php-fpm-security.conf /usr/local/etc/php-fpm.d/zz-security.conf
 WORKDIR /tmp
 
 # Download do Moodle com verificação de integridade
-RUN MOODLE_DOWNLOAD_URL="https://packaging.moodle.org/stable${MOODLE_VERSION}/moodle-latest-${MOODLE_VERSION}.tgz" \
+RUN MOODLE_DOWNLOAD_URL="https://download.moodle.org/download.php/direct/stable${MOODLE_VERSION}/moodle-latest-${MOODLE_VERSION}.tgz" \
     && curl -fSL -o moodle.tgz "${MOODLE_DOWNLOAD_URL}" \
     && mkdir -p ${MOODLE_DIR} \
     && tar -xzf moodle.tgz --strip-components=1 -C ${MOODLE_DIR} \

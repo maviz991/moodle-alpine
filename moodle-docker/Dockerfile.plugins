@@ -1,5 +1,5 @@
 # ==============================================================================
-# Dockerfile para Moodle Seguro
+# Dockerfile para Moodle Seguro com Plugins
 # Base: PHP 8.2 FPM Alpine (menor superfície de ataque)
 # Banco de Dados: MySQL/MariaDB externo ao container
 # ==============================================================================
@@ -7,53 +7,67 @@
 ARG MOODLE_VERSION=405
 ARG PHP_VERSION=8.2
 
-FROM php:${PHP_VERSION}-fpm-alpine AS base
+# ==============================================================================
+# STAGE 1: Builder - Instala plugins
+# ==============================================================================
+FROM php:${PHP_VERSION}-fpm-alpine AS builder
 
-# Re-declare ARGs after FROM (they don't persist across FROM)
-ARG MOODLE_VERSION=405
+ARG MOODLE_VERSION
+
+# Instala dependências para download de plugins
+RUN apk add --no-cache \
+    curl \
+    git \
+    jq \
+    unzip \
+    tar \
+    bash
+
+WORKDIR /build
+
+# Download do Moodle
+RUN MOODLE_DOWNLOAD_URL="https://download.moodle.org/download.php/direct/stable${MOODLE_VERSION}/moodle-latest-${MOODLE_VERSION}.tgz" \
+    && curl -fSL -o moodle.tgz "${MOODLE_DOWNLOAD_URL}" \
+    && mkdir -p /build/moodle \
+    && tar -xzf moodle.tgz --strip-components=1 -C /build/moodle \
+    && rm moodle.tgz
+
+# Copia manifesto e script de plugins
+COPY plugins/plugins.json /build/plugins/plugins.json
+COPY plugins/install-plugins.sh /build/plugins/install-plugins.sh
+RUN chmod +x /build/plugins/install-plugins.sh
+
+# Instala plugins
+ENV MOODLE_DIR=/build/moodle
+RUN /build/plugins/install-plugins.sh install
+
+# Lista plugins instalados para verificação
+RUN /build/plugins/install-plugins.sh verify
+
+# ==============================================================================
+# STAGE 2: Runtime - Imagem final otimizada
+# ==============================================================================
+FROM php:${PHP_VERSION}-fpm-alpine AS runtime
 
 LABEL maintainer="CDHU Infrastructure Team"
-LABEL description="Moodle LMS - Instalação Segura"
+LABEL description="Moodle LMS - Instalação Segura com Plugins"
 LABEL moodle.version="${MOODLE_VERSION}"
 
 # ==============================================================================
-# VARIÁVEIS DE AMBIENTE - SEGURANÇA
+# VARIÁVEIS DE AMBIENTE
 # ==============================================================================
-ENV MOODLE_VERSION=${MOODLE_VERSION}
 ENV MOODLE_DIR=/var/www/html
 ENV MOODLEDATA_DIR=/var/moodledata
-
-# Desabilita exposição de versão do PHP
 ENV PHP_EXPOSE_PHP=Off
-
-# Timezone
 ENV TZ=America/Sao_Paulo
 
 # ==============================================================================
-# PROXY CONFIGURATION (FortiGate SSL inspection)
-# ==============================================================================
-ARG HTTP_PROXY=http://10.71.48.17:8080
-ARG HTTPS_PROXY=http://10.71.48.17:8080
-ENV http_proxy=${HTTP_PROXY}
-ENV https_proxy=${HTTPS_PROXY}
-ENV HTTP_PROXY=${HTTP_PROXY}
-ENV HTTPS_PROXY=${HTTPS_PROXY}
-
-# ==============================================================================
-# CERTIFICADO CA DO FORTIGATE (SSL inspection proxy)
-# ==============================================================================
-COPY config/fortigate_proxy.crt /usr/local/share/ca-certificates/
-RUN cat /usr/local/share/ca-certificates/fortigate_proxy.crt >> /etc/ssl/certs/ca-certificates.crt
-
-# ==============================================================================
-# INSTALAÇÃO DE DEPENDÊNCIAS DO SISTEMA
+# INSTALAÇÃO DE DEPENDÊNCIAS
 # ==============================================================================
 RUN apk update && apk upgrade --no-cache \
     && apk add --no-cache \
-        # Dependências essenciais
         curl \
         wget \
-        git \
         unzip \
         tzdata \
         bash \
@@ -81,42 +95,42 @@ RUN apk update && apk upgrade --no-cache \
         openldap-dev \
         libsodium \
         libsodium-dev \
-        # Para compilação de extensões
+        # Para SAML2 plugin
+        openssl \
+        # Para compilação
         $PHPIZE_DEPS \
         linux-headers \
-    # Configura timezone
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone
 
 # ==============================================================================
-# INSTALAÇÃO DE EXTENSÕES PHP REQUERIDAS PELO MOODLE
+# EXTENSÕES PHP
 # ==============================================================================
 RUN docker-php-ext-configure gd \
         --with-freetype \
         --with-jpeg \
         --with-webp \
     && docker-php-ext-install -j$(nproc) \
-        # Extensões obrigatórias
         mysqli \
         pdo \
         pdo_mysql \
         gd \
         intl \
         soap \
+        xmlrpc \
         zip \
         opcache \
         exif \
-        # Extensões recomendadas
         xsl \
         ldap \
         sodium \
-    # Instala Redis para cache de sessão (recomendado)
+    # Redis
     && pecl install redis \
     && docker-php-ext-enable redis \
-    # Instala APCu para cache local
+    # APCu
     && pecl install apcu \
     && docker-php-ext-enable apcu \
-    # Limpeza pós-instalação (reduz tamanho da imagem)
+    # Limpeza
     && apk del --no-cache \
         freetype-dev \
         libjpeg-turbo-dev \
@@ -134,7 +148,7 @@ RUN docker-php-ext-configure gd \
     && rm -rf /tmp/* /var/cache/apk/*
 
 # ==============================================================================
-# CONFIGURAÇÃO DE SEGURANÇA DO PHP
+# CONFIGURAÇÕES PHP
 # ==============================================================================
 COPY config/php-security.ini /usr/local/etc/php/conf.d/99-security.ini
 COPY config/php-moodle.ini /usr/local/etc/php/conf.d/98-moodle.ini
@@ -142,36 +156,34 @@ COPY config/opcache.ini /usr/local/etc/php/conf.d/97-opcache.ini
 COPY config/php-fpm-security.conf /usr/local/etc/php-fpm.d/zz-security.conf
 
 # ==============================================================================
-# DOWNLOAD E VERIFICAÇÃO DO MOODLE
+# COPIA MOODLE COM PLUGINS DO BUILDER
 # ==============================================================================
-WORKDIR /tmp
-
-# Download do Moodle com verificação de integridade
-RUN MOODLE_DOWNLOAD_URL="https://packaging.moodle.org/stable${MOODLE_VERSION}/moodle-latest-${MOODLE_VERSION}.tgz" \
-    && curl -fSL -o moodle.tgz "${MOODLE_DOWNLOAD_URL}" \
-    && mkdir -p ${MOODLE_DIR} \
-    && tar -xzf moodle.tgz --strip-components=1 -C ${MOODLE_DIR} \
-    && rm moodle.tgz
+COPY --from=builder /build/moodle ${MOODLE_DIR}
 
 # ==============================================================================
-# CRIAÇÃO DE USUÁRIO NÃO-ROOT (SEGURANÇA)
+# PLUGINS LOCAIS (opcional - para plugins proprietários)
+# Descomente se tiver plugins que não podem ser baixados automaticamente
+# ==============================================================================
+# COPY plugins/local/ ${MOODLE_DIR}/
+
+# ==============================================================================
+# USUÁRIO NÃO-ROOT
 # ==============================================================================
 RUN addgroup -g 1000 -S moodle \
     && adduser -u 1000 -S moodle -G moodle \
     && mkdir -p ${MOODLEDATA_DIR} \
-    && chown -R moodle:moodle ${MOODLE_DIR} ${MOODLEDATA_DIR}
+    && mkdir -p /var/log/php \
+    && chown -R moodle:moodle ${MOODLE_DIR} ${MOODLEDATA_DIR} /var/log/php
 
 # ==============================================================================
-# HARDENING DE PERMISSÕES
+# PERMISSÕES
 # ==============================================================================
-# Moodle: somente leitura (exceto durante instalação)
 RUN chmod -R 755 ${MOODLE_DIR} \
     && find ${MOODLE_DIR} -type f -exec chmod 644 {} \; \
-    # Moodledata: leitura e escrita para o usuário moodle
     && chmod 770 ${MOODLEDATA_DIR}
 
 # ==============================================================================
-# SCRIPTS DE INICIALIZAÇÃO E HEALTH CHECK
+# SCRIPTS
 # ==============================================================================
 COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY scripts/healthcheck.sh /usr/local/bin/healthcheck.sh
@@ -182,14 +194,11 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/healthcheck.sh
 # ==============================================================================
 WORKDIR ${MOODLE_DIR}
 
-# Expõe apenas a porta do PHP-FPM (não HTTP direto)
 EXPOSE 9000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD /usr/local/bin/healthcheck.sh
 
-# Executa como usuário não-root
 USER moodle
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
