@@ -106,6 +106,12 @@ The mysql service in docker-compose.yml is for development only. Production depl
 
 ## Build Environment Notes
 
-**FortiGate SSL Inspection:** The Docker daemon is configured with an HTTPS proxy at `10.71.48.17:8080` that performs SSL inspection. The `config/fortigate_proxy.crt` file contains the CA certificate required for Alpine containers to trust HTTPS connections during build. If builds fail with "TLS: server certificate not trusted", verify this certificate is current.
+**FortiGate SSL Inspection (CDHU network):** Builds behind the corporate FortiGate proxy at `10.71.48.17:8080` require three separate things — the Docker *daemon* proxy (systemd drop-in), the corporate CA in the WSL trust store, and the build-time proxy args. Run `sudo bash scripts/setup-wsl-proxy.sh` (or `make setup-proxy`) once; it configures all three and verifies with a real `docker pull`.
+
+- CA certificates live in `config/ca/*.crt` (public certs, intentionally committed — `.gitignore` has an explicit exception). The trust chain roots at `cdhu-SRV-VP-009-CA`, with `CN=10.71.48.17` as the FortiGate intermediate. Both expire April 2027.
+- Both Dockerfiles take `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY` build args that **default to empty**, so the image builds off-network unchanged. They install any `.crt` found in `config/ca/` and skip silently if none exist, then clear the proxy env vars in the final stage so containers don't route through the proxy at runtime.
+- Proxy source per entrypoint: `make build` → `BUILD_PROXY` variable; `docker compose build` → `BUILD_PROXY` in `.env`; plain `docker build` → explicit `--build-arg`.
+- To build off-network: `make build BUILD_PROXY=`.
+- Note: WSL inherits `http_proxy=http://PROXY:8080` from Windows via WSLENV, and the hostname `PROXY` does not resolve inside WSL. The setup script overrides it in `/etc/profile.d/zz-cdhu-proxy.sh`.
 
 **PHP 8.x Compatibility:** The `xmlrpc` extension is not available in PHP 8.0+ (removed, was deprecated in 7.4). Moodle 4.x does not require it.

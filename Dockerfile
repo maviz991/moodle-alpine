@@ -30,20 +30,46 @@ ENV PHP_EXPOSE_PHP=Off
 ENV TZ=America/Sao_Paulo
 
 # ==============================================================================
-# PROXY CONFIGURATION (FortiGate SSL inspection)
+# PROXY CONFIGURATION (opcional - rede com inspecao SSL)
 # ==============================================================================
-ARG HTTP_PROXY=http://10.71.48.17:8080
-ARG HTTPS_PROXY=http://10.71.48.17:8080
-ENV http_proxy=${HTTP_PROXY}
-ENV https_proxy=${HTTPS_PROXY}
-ENV HTTP_PROXY=${HTTP_PROXY}
-ENV HTTPS_PROXY=${HTTPS_PROXY}
+# Vazio por padrao: a imagem builda em qualquer rede sem alteracao.
+# Na rede da CDHU, passe:
+#   docker build --build-arg HTTP_PROXY=http://10.71.48.17:8080 \
+#                --build-arg HTTPS_PROXY=http://10.71.48.17:8080 ...
+# ou simplesmente use `make build` (o Makefile detecta o proxy do ambiente).
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ARG NO_PROXY=localhost,127.0.0.1,::1
+ENV http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY} \
+    HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY} \
+    no_proxy=${NO_PROXY} \
+    NO_PROXY=${NO_PROXY}
 
 # ==============================================================================
-# CERTIFICADO CA DO FORTIGATE (SSL inspection proxy)
+# CERTIFICADOS CA CORPORATIVOS (opcional)
 # ==============================================================================
-COPY config/fortigate_proxy.crt /usr/local/share/ca-certificates/
-RUN cat /usr/local/share/ca-certificates/fortigate_proxy.crt >> /etc/ssl/certs/ca-certificates.crt
+# Qualquer .crt (PEM) em config/ca/ e instalado no trust store da imagem.
+# Se o diretorio estiver vazio, o build segue normalmente - nao quebra fora da
+# rede corporativa. Gere os certs com: sudo bash scripts/setup-wsl-proxy.sh
+COPY config/ca/ /tmp/ca-certs/
+RUN set -eux; \
+    if ls /tmp/ca-certs/*.crt >/dev/null 2>&1; then \
+        mkdir -p /usr/local/share/ca-certificates; \
+        cp /tmp/ca-certs/*.crt /usr/local/share/ca-certificates/; \
+        # Anexa direto no bundle: nao depende de rede nem do pacote
+        # ca-certificates, que ainda nao poderia ser baixado neste ponto.
+        cat /tmp/ca-certs/*.crt >> /etc/ssl/certs/ca-certificates.crt; \
+        # Se o update-ca-certificates existir na base, normaliza os hashes.
+        if command -v update-ca-certificates >/dev/null 2>&1; then \
+            update-ca-certificates || true; \
+        fi; \
+        echo "CA corporativas instaladas:"; ls -1 /usr/local/share/ca-certificates/; \
+    else \
+        echo "Nenhuma CA corporativa em config/ca/ - seguindo sem."; \
+    fi; \
+    rm -rf /tmp/ca-certs
 
 # ==============================================================================
 # INSTALAÇÃO DE DEPENDÊNCIAS DO SISTEMA
@@ -180,6 +206,16 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/healthcheck.sh
 # ==============================================================================
 # CONFIGURAÇÃO FINAL
 # ==============================================================================
+# Limpa o proxy de build: em runtime o container nao deve rotear tudo pelo
+# FortiGate (o proxy so e necessario durante o build). As CAs continuam
+# instaladas no trust store.
+ENV http_proxy= \
+    https_proxy= \
+    HTTP_PROXY= \
+    HTTPS_PROXY= \
+    no_proxy= \
+    NO_PROXY=
+
 WORKDIR ${MOODLE_DIR}
 
 # Expõe apenas a porta do PHP-FPM (não HTTP direto)

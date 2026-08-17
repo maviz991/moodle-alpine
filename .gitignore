@@ -10,6 +10,11 @@ certs/
 *.pem
 *.key
 *.crt
+moodle_alpine2/config/ca
+
+# Excecao: CAs corporativas usadas no build (certificado publico, sem chave
+# privada). Necessario no repo para o build funcionar em qualquer clone.
+!config/ca/*.crt
 
 # Logs
 logs/

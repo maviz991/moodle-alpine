@@ -14,9 +14,33 @@ FROM php:${PHP_VERSION}-fpm-alpine AS builder
 
 ARG MOODLE_VERSION
 
-# Instala certificado CA do FortiGate (SSL inspection proxy)
-COPY config/fortigate_proxy.crt /usr/local/share/ca-certificates/
-RUN cat /usr/local/share/ca-certificates/fortigate_proxy.crt >> /etc/ssl/certs/ca-certificates.crt
+# ------------------------------------------------------------------------------
+# PROXY (opcional - vazio por padrao, ver Dockerfile para detalhes)
+# ------------------------------------------------------------------------------
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ARG NO_PROXY=localhost,127.0.0.1,::1
+ENV http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY} \
+    HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY} \
+    no_proxy=${NO_PROXY} \
+    NO_PROXY=${NO_PROXY}
+
+# ------------------------------------------------------------------------------
+# CAs corporativas (opcional) - qualquer .crt em config/ca/
+# ------------------------------------------------------------------------------
+COPY config/ca/ /tmp/ca-certs/
+RUN set -eux; \
+    if ls /tmp/ca-certs/*.crt >/dev/null 2>&1; then \
+        mkdir -p /usr/local/share/ca-certificates; \
+        cp /tmp/ca-certs/*.crt /usr/local/share/ca-certificates/; \
+        cat /tmp/ca-certs/*.crt >> /etc/ssl/certs/ca-certificates.crt; \
+        if command -v update-ca-certificates >/dev/null 2>&1; then \
+            update-ca-certificates || true; \
+        fi; \
+    fi; \
+    rm -rf /tmp/ca-certs
 
 # Instala dependências para download de plugins
 RUN apk add --no-cache \
@@ -66,10 +90,32 @@ ENV PHP_EXPOSE_PHP=Off
 ENV TZ=America/Sao_Paulo
 
 # ==============================================================================
-# CERTIFICADO CA DO FORTIGATE (SSL inspection proxy)
+# PROXY DE BUILD (opcional) + CAs CORPORATIVAS (opcional)
 # ==============================================================================
-COPY config/fortigate_proxy.crt /usr/local/share/ca-certificates/
-RUN cat /usr/local/share/ca-certificates/fortigate_proxy.crt >> /etc/ssl/certs/ca-certificates.crt
+ARG HTTP_PROXY=
+ARG HTTPS_PROXY=
+ARG NO_PROXY=localhost,127.0.0.1,::1
+ENV http_proxy=${HTTP_PROXY} \
+    https_proxy=${HTTPS_PROXY} \
+    HTTP_PROXY=${HTTP_PROXY} \
+    HTTPS_PROXY=${HTTPS_PROXY} \
+    no_proxy=${NO_PROXY} \
+    NO_PROXY=${NO_PROXY}
+
+COPY config/ca/ /tmp/ca-certs/
+RUN set -eux; \
+    if ls /tmp/ca-certs/*.crt >/dev/null 2>&1; then \
+        mkdir -p /usr/local/share/ca-certificates; \
+        cp /tmp/ca-certs/*.crt /usr/local/share/ca-certificates/; \
+        cat /tmp/ca-certs/*.crt >> /etc/ssl/certs/ca-certificates.crt; \
+        if command -v update-ca-certificates >/dev/null 2>&1; then \
+            update-ca-certificates || true; \
+        fi; \
+        echo "CA corporativas instaladas:"; ls -1 /usr/local/share/ca-certificates/; \
+    else \
+        echo "Nenhuma CA corporativa em config/ca/ - seguindo sem."; \
+    fi; \
+    rm -rf /tmp/ca-certs
 
 # ==============================================================================
 # INSTALAÇÃO DE DEPENDÊNCIAS
@@ -201,6 +247,14 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/healthcheck.sh
 # ==============================================================================
 # CONFIGURAÇÃO FINAL
 # ==============================================================================
+# Limpa o proxy de build (so necessario durante o build, nao em runtime)
+ENV http_proxy= \
+    https_proxy= \
+    HTTP_PROXY= \
+    HTTPS_PROXY= \
+    no_proxy= \
+    NO_PROXY=
+
 WORKDIR ${MOODLE_DIR}
 
 EXPOSE 9000

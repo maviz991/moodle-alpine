@@ -1,171 +1,154 @@
-# Configuração do Certificado de Proxy SSL (FortiGate)
+# Setup do Proxy SSL (FortiGate CDHU) — WSL + Docker
 
-> **Contexto:** A rede usa um proxy FortiGate que faz inspeção SSL.
-> O sistema precisa confiar no CA do FortiGate para `docker build`, `docker pull` e `apt` funcionarem.
+> **Contexto:** a rede da CDHU tem um proxy FortiGate em `10.71.48.17:8080` que faz
+> inspeção SSL. Sem configurar, `docker pull` e `docker build` falham.
+
+## TL;DR
+
+```bash
+cd /mnt/c/Users/<seu-usuario>/Repositorio/Moodle/docker/moodle_alpine2
+sudo bash scripts/setup-wsl-proxy.sh
+```
+
+Abra um shell **novo** e rode `make build`. Pronto.
+
+O resto deste documento explica o que o script faz e como diagnosticar.
 
 ---
 
-## Pré-requisito — Instalar o OpenSSL
+## Por que falhava
 
-### Caso normal (apt funcionando)
+São **três** problemas independentes. Corrigir só um não resolve.
 
-```bash
-sudo apt update && sudo apt install -y openssl ca-certificates
+### 1. Docker daemon sem proxy → `context deadline exceeded`
+
+O `docker pull` é feito pelo **daemon**, não pelo seu shell. O daemon não lê
+`http_proxy` do seu terminal. Sem proxy configurado nele, ele tenta saída direta
+para a internet — que é bloqueada — e dá timeout:
+
+```
+Error response from daemon: Get "https://registry-1.docker.io/v2/":
+context deadline exceeded (Client.Timeout exceeded while awaiting headers)
 ```
 
-### ⚠️ Se o `apt` também falhar com erro SSL
+**Correção:** systemd drop-in em `/etc/systemd/system/docker.service.d/http-proxy.conf`.
 
-O `apt` em si pode estar bloqueado pelo proxy. Solução: ignorar SSL só nessa instalação inicial:
+### 2. Variável `http_proxy=http://PROXY:8080` herdada do Windows
+
+O Windows exporta essa variável para o WSL via `WSLENV`. Mas o hostname literal
+`PROXY` **não resolve** dentro do WSL:
 
 ```bash
-# Atualiza ignorando verificação SSL (só desta vez)
-sudo apt -o Acquire::https::Verify-Peer=false \
-         -o Acquire::https::Verify-Host=false \
-         update
-
-# Instala openssl e ca-certificates
-sudo apt -o Acquire::https::Verify-Peer=false \
-         -o Acquire::https::Verify-Host=false \
-         install -y openssl ca-certificates
+$ getent hosts PROXY
+(nada)
 ```
 
-> Após instalar o openssl e adicionar o CA do FortiGate (passos abaixo),
-> o `apt` voltará a funcionar normalmente sem precisar do flag.
+Resultado: todo `curl`, `apt`, `git` e `docker build` falha com erro de DNS ou
+"could not resolve proxy".
+
+**Correção:** `/etc/profile.d/zz-cdhu-proxy.sh` reescreve para o IP real.
+
+### 3. CA errada no trust store
+
+A CA que estava em `config/fortigate_proxy.crt` (`O=Fortinet, CN=FG180FTK23901473`)
+**não faz parte da cadeia emitida pelo proxy hoje**. Instalar ela não adianta nada.
+
+A cadeia real é:
+
+```
+folha:          CN=*.docker.com
+  emitida por:  CN=10.71.48.17, emailAddress=fortigate@cdhu.sp.gov.br   (CA intermediária)
+    emitida por: DC=br, DC=gov, DC=sp, DC=cdhu, CN=cdhu-SRV-VP-009-CA   (CA raiz)
+```
+
+**Correção:** o script extrai a cadeia ao vivo do proxy e instala as CAs em
+`config/ca/`, sem depender de arquivo enviado por colega.
 
 ---
 
-## Passo 1 - Extrair o certificado CA do proxy
+## Verificação manual (se quiser conferir)
 
-Execute no terminal WSL:
-
-```bash
-echo QUIT | openssl s_client \
-  -proxy 10.71.48.17:8080 \
-  -connect google.com:443 \
-  -showcerts 2>/dev/null \
-  | sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' \
-  | awk 'BEGIN{n=0} /BEGIN CERT/{n++} n==2{print} /END CERT/ && n==2{exit}' \
-  > /tmp/fortigate_proxy.crt
-```
-
-Verificação:
+### Cadeia atual do proxy
 
 ```bash
-openssl x509 -in /tmp/fortigate_proxy.crt -noout -subject -dates
+env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
+  openssl s_client -proxy 10.71.48.17:8080 \
+    -connect registry-1.docker.io:443 -servername registry-1.docker.io \
+    -showcerts </dev/null 2>/dev/null \
+  | openssl crl2pkcs7 -nocrl -certfile /dev/stdin \
+  | openssl pkcs7 -print_certs -noout
 ```
 
-Saída esperada (algo parecido com):
+Deve terminar em `CN=cdhu-SRV-VP-009-CA`.
 
-```
-subject=C=US, ST=California, O=Fortinet, CN=<nome-do-fortigate>
-notBefore=...
-notAfter=...
-```
-
-> O `CN=` varia conforme o equipamento FortiGate da unidade (ex: `CN=FG180FTK23901473`, `CN=wr2`, etc.).
-> O importante é que apareça `O=Fortinet` e as datas sejam válidas.
-
----
-
-## Passo 2 - Instalar o certificado no sistema (WSL/Debian)
+### CAs instaladas no sistema
 
 ```bash
-# Copia para o store de CAs do sistema
-sudo cp /tmp/fortigate_proxy.crt \
-     /usr/local/share/ca-certificates/fortigate-proxy.crt
-
-# Atualiza o bundle de CAs
-sudo update-ca-certificates
+ls /usr/local/share/ca-certificates/
+grep -c "cdhu" /etc/ssl/certs/ca-certificates.crt
 ```
 
-Saída esperada:
-
-```
-Updating certificates in /etc/ssl/certs...
-1 added, 0 removed; done.
-```
-
----
-
-## Passo 3 - Copiar o cert para o projeto
-
-Primeiro, confirme qual arquivo usar:
+### Proxy do daemon
 
 ```bash
-ls -lh /tmp/*.crt
+docker info | grep -i proxy
 ```
 
-> Se o arquivo tiver outro nome (ex: `fortigate_wr2.crt`), use esse nome nos passos abaixo.
+Deve mostrar `HTTP Proxy: http://10.71.48.17:8080`.
 
-### Opção A — Windows Explorer (mais fácil)
-
-1. Abra o Explorer e na barra de endereço digite:
-   ```
-   \\wsl$\Debian\tmp
-   ```
-2. Copie o arquivo `.crt` correto
-3. Cole em `C:\Users\<seu-usuario>\moodle-alpine\moodle-docker-alpine\config\`
-4. **Renomeie para `fortigate_proxy.crt`** se tiver outro nome
-
-### Opção B — Terminal WSL
+### Teste de ponta a ponta
 
 ```bash
-cp /tmp/fortigate_proxy.crt \
-   "/mnt/c/Users/$(whoami | cut -d'\' -f2)/moodle-alpine/moodle-docker-alpine/config/fortigate_proxy.crt"
+docker pull hello-world
 ```
 
 ---
 
-## Passo 4 - Reiniciar o Docker daemon
+## Como o build usa isso
 
-O daemon precisa recarregar o trust store para aceitar o pull de imagens:
+O `Dockerfile` **não tem mais proxy nem cert hardcoded**. Ele:
 
-```bash
-sudo service docker restart
-```
+- aceita `--build-arg HTTP_PROXY=...` (vazio por padrão — builda fora da rede sem alteração)
+- instala **qualquer** `.crt` que exista em `config/ca/`; se a pasta estiver vazia,
+  o build segue normalmente
+- **limpa** as variáveis de proxy no final, para o container não rotear tudo pelo
+  FortiGate em runtime
 
-Verifique se subiu:
+Fontes do proxy no build:
 
-```bash
-docker info | head -5
-```
+| Comando | De onde vem o proxy |
+|---|---|
+| `make build` | variável `BUILD_PROXY` do Makefile (default: `10.71.48.17:8080`) |
+| `docker compose build` | `BUILD_PROXY` do arquivo `.env` |
+| `docker build` direto | você passa `--build-arg HTTP_PROXY=...` |
 
----
-
-## Passo 5 - Testar o build
-
-```bash
-cd /mnt/c/Users/<SEU_USUARIO>/moodle-alpine/moodle-docker-alpine
-
-# Build de desenvolvimento (Dockerfile básico)
-docker build -f Dockerfile -t moodle-dev:test .
-```
-
-Para subir o ambiente completo de dev:
+Para buildar **fora** da rede CDHU:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+make build BUILD_PROXY=
 ```
-
-Acesse em: **http://localhost:8080**
 
 ---
 
 ## Troubleshooting
 
-| Erro | Causa | Solução |
+| Sintoma | Causa | Correção |
 |---|---|---|
-| `x509: certificate signed by unknown authority` | CA não instalado no Docker daemon | Refaça os passos 2 e 4 |
-| `COPY failed: file not found: config/fortigate_proxy.crt` | Cert não copiado para o projeto | Refaça o passo 3 |
-| `tls: failed to verify certificate` | Cert expirado ou errado | Refaça o passo 1 |
-| `openssl: command not found` | openssl não instalado | Veja seção **Pré-requisito** acima |
-| `apt` falha com erro SSL | Proxy bloqueia o próprio apt | Use o flag `Acquire::https::Verify-Peer=false` (ver Pré-requisito) |
-| `sudo: service: command not found` | Docker não registrado como serviço | Tente `sudo dockerd &` ou abra o Docker Desktop |
+| `context deadline exceeded` no pull | daemon sem proxy | `sudo bash scripts/setup-wsl-proxy.sh` |
+| `could not resolve proxy: PROXY` | env var herdada do Windows | abra shell novo após rodar o script |
+| `x509: certificate signed by unknown authority` | CA não instalada ou errada | rode o script; ele extrai a CA ao vivo |
+| `tls: failed to verify certificate` | CA raiz da CDHU ausente do bundle | `grep -c cdhu /etc/ssl/certs/ca-certificates.crt` deve ser > 0 |
+| Build trava em `apk update` | proxy não chegou no build | confira `docker build` com `--build-arg HTTP_PROXY=` preenchido |
+| `Proxy inacessivel` no script | fora da rede / VPN desligada | conecte na rede CDHU ou builde com `BUILD_PROXY=` |
+| Funciona no shell mas não no daemon | daemon não reiniciado | `sudo systemctl restart docker` |
 
 ---
 
 ## Observações
 
-- O certificado extraído é válido até **2035** (não precisa refazer tão cedo).
-- O arquivo `config/fortigate_proxy.crt` **não deve ser commitado**, deve está no `.gitignore`.
-
+- A CA raiz `cdhu-SRV-VP-009-CA` expira em **abril/2027**; a intermediária do
+  FortiGate também. Quando expirarem, rode o script de novo — ele re-extrai.
+- Os arquivos em `config/ca/` são **certificados públicos** (sem chave privada) e
+  ficam versionados de propósito, para o build funcionar em qualquer clone.
+  O `.gitignore` tem uma exceção explícita para eles.
+- Rodar o script mais de uma vez é seguro (idempotente).

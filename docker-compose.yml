@@ -21,6 +21,10 @@ services:
       args:
         MOODLE_VERSION: "405"
         PHP_VERSION: "8.2"
+        # Proxy de build. Vem do .env (BUILD_PROXY). Deixe vazio fora da rede CDHU.
+        HTTP_PROXY: "${BUILD_PROXY:-}"
+        HTTPS_PROXY: "${BUILD_PROXY:-}"
+        NO_PROXY: "${BUILD_NO_PROXY:-localhost,127.0.0.1,::1}"
     image: moodle-secure:4.5
     container_name: moodle-app
     restart: unless-stopped

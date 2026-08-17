@@ -2,7 +2,7 @@
 # Makefile - Moodle Docker Build & Management
 # ==============================================================================
 
-.PHONY: help build build-plugins push run stop logs shell clean verify-plugins
+.PHONY: help setup-proxy build build-plugins push run stop logs shell clean verify-plugins
 
 # Variáveis
 REGISTRY ?= registry.cdhu.sp.gov.br
@@ -11,6 +11,19 @@ MOODLE_VERSION ?= 405
 TAG ?= $(MOODLE_VERSION)-$(shell date +%Y%m%d)
 FULL_IMAGE = $(REGISTRY)/$(IMAGE_NAME):$(TAG)
 LATEST_IMAGE = $(REGISTRY)/$(IMAGE_NAME):latest
+
+# ------------------------------------------------------------------------------
+# PROXY DE BUILD
+# Na rede da CDHU o proxy e obrigatorio. Sobrescreva com:
+#   make build BUILD_PROXY=            (para buildar fora da rede, sem proxy)
+#   make build BUILD_PROXY=http://outro:3128
+# ------------------------------------------------------------------------------
+BUILD_PROXY ?= http://10.71.48.17:8080
+BUILD_NO_PROXY ?= localhost,127.0.0.1,::1,.cdhu.sp.gov.br,.sp.gov.br
+
+PROXY_ARGS = --build-arg HTTP_PROXY=$(BUILD_PROXY) \
+             --build-arg HTTPS_PROXY=$(BUILD_PROXY) \
+             --build-arg NO_PROXY=$(BUILD_NO_PROXY)
 
 # Cores
 GREEN := \033[0;32m
@@ -35,10 +48,14 @@ help: ## Mostra esta ajuda
 # BUILD
 # ==============================================================================
 
+setup-proxy: ## Configura WSL + Docker daemon para o proxy da CDHU (roda 1x, pede sudo)
+	sudo bash scripts/setup-wsl-proxy.sh
+
 build: ## Build imagem básica (sem plugins)
 	@echo "$(GREEN)Building Moodle $(MOODLE_VERSION) (sem plugins)...$(NC)"
 	docker build \
 		--build-arg MOODLE_VERSION=$(MOODLE_VERSION) \
+		$(PROXY_ARGS) \
 		-t $(IMAGE_NAME):$(TAG) \
 		-t $(IMAGE_NAME):latest \
 		-f Dockerfile .
@@ -48,6 +65,7 @@ build-plugins: ## Build imagem com plugins (produção)
 	@echo "$(GREEN)Building Moodle $(MOODLE_VERSION) com plugins...$(NC)"
 	docker build \
 		--build-arg MOODLE_VERSION=$(MOODLE_VERSION) \
+		$(PROXY_ARGS) \
 		-t $(IMAGE_NAME):$(TAG)-plugins \
 		-t $(IMAGE_NAME):latest \
 		-f Dockerfile.plugins .
@@ -56,6 +74,7 @@ build-plugins: ## Build imagem com plugins (produção)
 build-no-cache: ## Build sem cache (força download)
 	docker build --no-cache \
 		--build-arg MOODLE_VERSION=$(MOODLE_VERSION) \
+		$(PROXY_ARGS) \
 		-t $(IMAGE_NAME):$(TAG)-plugins \
 		-f Dockerfile.plugins .
 
@@ -174,7 +193,7 @@ test-config: ## Verifica configuração
 	@jq empty plugins/plugins.json && echo "$(GREEN)✓ plugins.json válido$(NC)"
 
 test-build: ## Testa build da imagem
-	docker build --target builder -f Dockerfile.plugins -t test-builder .
+	docker build --target builder $(PROXY_ARGS) -f Dockerfile.plugins -t test-builder .
 	@echo "$(GREEN)✓ Build test passou$(NC)"
 
 # ==============================================================================
@@ -184,6 +203,7 @@ test-build: ## Testa build da imagem
 ci-build: ## Build para CI (com tag do commit)
 	docker build \
 		--build-arg MOODLE_VERSION=$(MOODLE_VERSION) \
+		$(PROXY_ARGS) \
 		-t $(REGISTRY)/$(IMAGE_NAME):$(shell git rev-parse --short HEAD) \
 		-f Dockerfile.plugins .
 

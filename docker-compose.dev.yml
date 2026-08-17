@@ -18,7 +18,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    
+      args:
+        HTTP_PROXY: "${BUILD_PROXY:-}"
+        HTTPS_PROXY: "${BUILD_PROXY:-}"
+        NO_PROXY: "${BUILD_NO_PROXY:-localhost,127.0.0.1,::1}"
+
     environment:
       MOODLE_DEBUG: "true"
       MOODLE_SSL_PROXY: "false"
