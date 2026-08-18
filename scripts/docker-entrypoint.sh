@@ -123,7 +123,14 @@ configure_moodle() {
         log_info "config.php já existe e MOODLE_SKIP_INSTALL=true. Mantendo configuração existente."
         return 0
     fi
-    
+
+    # config.php é protegido com chmod 440 no final desta função; sem isso,
+    # qualquer restart do container (não só rebuild) falha com "Permission denied"
+    # ao tentar regenerar o arquivo.
+    if [ -f "$config_file" ]; then
+        chmod u+w "$config_file"
+    fi
+
     log_info "Gerando config.php seguro..."
     
     # Gera salt seguro se não fornecido
@@ -140,8 +147,10 @@ configure_moodle() {
     
     # SSL Proxy settings
     local ssl_proxy_setting=""
+    local cookiesecure_value="false"
     if [ "$MOODLE_SSL_PROXY" = "true" ]; then
         ssl_proxy_setting='$CFG->sslproxy = true;'
+        cookiesecure_value="true"
     fi
     
     cat > "$config_file" << EOFCONFIG
@@ -197,7 +206,7 @@ global \$CFG;
 ${ssl_proxy_setting}
 
 // Headers de segurança
-\$CFG->cookiesecure = true;
+\$CFG->cookiesecure = ${cookiesecure_value};
 \$CFG->cookiehttponly = true;
 
 // Desabilita CLI installer pela web
