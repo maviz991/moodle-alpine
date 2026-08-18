@@ -136,6 +136,10 @@ RUN docker-php-ext-configure gd \
         xsl \
         ldap \
         sodium \
+    # Atualiza o canal do PECL antes de instalar: sem isso, o pecl install
+    # falha às vezes com "Package does not have REST info xml available"
+    # (cache/metadados do canal desatualizado, independente de proxy)
+    && pecl channel-update pecl.php.net \
     # Instala Redis para cache de sessão (recomendado)
     && pecl install redis \
     && docker-php-ext-enable redis \
