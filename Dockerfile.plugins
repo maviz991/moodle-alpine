@@ -179,15 +179,24 @@ RUN docker-php-ext-configure gd \
         xsl \
         ldap \
         sodium \
-    # Atualiza o canal do PECL antes de instalar: sem isso, o pecl install
-    # falha às vezes com "Package does not have REST info xml available"
-    # (cache/metadados do canal desatualizado, independente de proxy)
-    && pecl channel-update pecl.php.net \
-    # Redis
-    && pecl install redis \
+    # pecl install redis/apcu falha de forma intermitente com "Package does
+    # not have REST info xml available" (rede instável até pecl.php.net,
+    # ex: atrás de proxy com inspeção SSL) — às vezes um pacote instala e o
+    # outro falha no mesmo build. Tenta de novo em vez de assumir que a
+    # primeira tentativa funciona.
+    && for i in 1 2 3 4 5; do \
+        pecl channel-update pecl.php.net && pecl install redis && break; \
+        echo "pecl install redis falhou (tentativa $i/5)"; \
+        [ "$i" -eq 5 ] && exit 1; \
+        sleep 5; \
+    done \
     && docker-php-ext-enable redis \
-    # APCu
-    && pecl install apcu \
+    && for i in 1 2 3 4 5; do \
+        pecl channel-update pecl.php.net && pecl install apcu && break; \
+        echo "pecl install apcu falhou (tentativa $i/5)"; \
+        [ "$i" -eq 5 ] && exit 1; \
+        sleep 5; \
+    done \
     && docker-php-ext-enable apcu \
     # Limpeza
     && apk del --no-cache \
