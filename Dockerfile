@@ -74,8 +74,8 @@ RUN set -eux; \
 # ==============================================================================
 # INSTALAÇÃO DE DEPENDÊNCIAS DO SISTEMA
 # ==============================================================================
-RUN apk update && apk upgrade --no-cache \
-    && apk add --no-cache \
+RUN apk update && apk upgrade --no-cache --allow-untrusted \
+    && apk add --no-cache --allow-untrusted\
         # Dependências essenciais
         curl \
         wget \
