@@ -247,7 +247,7 @@ install_plugin() {
 process_plugins() {
     log_step "Processando manifesto de plugins..."
     
-    local fail_on_error=$(jq -r '.settings.fail_on_error // true' "$PLUGINS_JSON")
+    local fail_on_error=$(jq -r 'if .settings.fail_on_error == null then true else .settings.fail_on_error end' "$PLUGINS_JSON")
     local total=$(jq '[.plugins[] | select(.enabled == true)] | length' "$PLUGINS_JSON")
     local count=0
     local failed=0

@@ -19,7 +19,7 @@
             "type": "mod",
             "source": "github",
             "repo": "h5p/moodle-mod_hvp",
-            "version": "1.27.2",
+            "version": "1.27.3",
             "enabled": true
         },
         {
